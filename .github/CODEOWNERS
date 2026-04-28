@@ -1,0 +1,12 @@
+# Backend files
+/app/ @backend-developer-username
+/database/ @backend-developer-username
+/routes/ @backend-developer-username
+
+# Frontend views
+/resources/views/ @frontend-developer-username
+/resources/js/ @frontend-developer-username
+/resources/css/ @frontend-developer-username
+
+# Documentation
+/docs/ @your-github-username
