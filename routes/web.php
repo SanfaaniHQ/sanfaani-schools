@@ -33,7 +33,6 @@ use App\Http\Controllers\School\AdmissionNumberSettingController;
 use App\Http\Controllers\School\ClassUploadController;
 use App\Http\Controllers\School\GradingScaleController;
 use App\Http\Controllers\School\ManualResultController;
-use App\Http\Controllers\School\MailSettingController as SchoolMailSettingController;
 use App\Http\Controllers\School\ResultAccessPolicyController as SchoolResultAccessPolicyController;
 use App\Http\Controllers\School\ResultPublishingController;
 use App\Http\Controllers\School\ResultSystemController as SchoolResultSystemController;
@@ -348,10 +347,6 @@ Route::middleware(['auth'])
                 Route::get('/dashboard', [SchoolAdminDashboardController::class, 'index'])
                     ->name('dashboard');
 
-                Route::get('/students/{student}', [StudentController::class, 'show'])
-                    ->whereNumber('student')
-                    ->name('students.show');
-
                 Route::middleware('role:school_admin')
                     ->group(function () {
                         Route::get('/students/upload', [StudentBulkUploadController::class, 'index'])
@@ -448,15 +443,6 @@ Route::middleware(['auth'])
 
         Route::middleware('role:school_admin|super_admin')
             ->group(function () {
-                Route::get('/mail-settings', [SchoolMailSettingController::class, 'edit'])
-                    ->name('mail-settings.edit');
-
-                Route::patch('/mail-settings', [SchoolMailSettingController::class, 'update'])
-                    ->name('mail-settings.update');
-
-                Route::post('/mail-settings/test', [SchoolMailSettingController::class, 'test'])
-                    ->name('mail-settings.test');
-
                 Route::get('/teacher-assignments', [TeacherAssignmentController::class, 'index'])
                     ->name('teacher-assignments.index');
 
