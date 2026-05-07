@@ -1,6 +1,20 @@
 <x-app-layout>
     @php
-        $canManageStudents = auth()->user()->hasRole('school_admin') || (auth()->user()->hasRole('super_admin') && session('support_school_id'));
+        $controlCenterPermissions = $controlCenterPermissions ?? [];
+        $canManageStudents = (bool) ($controlCenterPermissions['can_manage_profile'] ?? (auth()->user()->hasRole('school_admin') || (auth()->user()->hasRole('super_admin') && session('support_school_id'))));
+        $canEnterResults = (bool) ($controlCenterPermissions['can_enter_results'] ?? false);
+        $canUploadResults = (bool) ($controlCenterPermissions['can_upload_results'] ?? false);
+        $canPromote = (bool) ($controlCenterPermissions['can_promote'] ?? false);
+        $canCommunicate = (bool) ($controlCenterPermissions['can_send_communication'] ?? false);
+        $canViewReportCards = (bool) ($controlCenterPermissions['can_view_report_cards'] ?? false);
+        $roleContext = $controlCenterPermissions['role_context'] ?? null;
+        $backUrl = Route::has('school.students.index') && in_array($roleContext, ['school_admin', 'result_officer'], true)
+            ? route('school.students.index')
+            : (Route::has('school.dashboard') ? route('school.dashboard') : url()->previous());
+        $resultEntryUrl = $roleContext === 'teacher' && Route::has('school.teacher-results.create')
+            ? route('school.teacher-results.create', ['school_class_id' => $student->school_class_id])
+            : (Route::has('school.results.manual.create') ? route('school.results.manual.create', ['student_id' => $student->id]) : null);
+        $workspaceRows = collect($resultWorkspace['rows'] ?? []);
     @endphp
 
     <!-- Print Styles -->
@@ -34,12 +48,18 @@
                         <span>•</span>
                         <x-status-badge :status="$student->status" />
                     </div>
+                    <div class="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
+                        <span>{{ $school->name }}</span>
+                        <span>Current session: {{ $activeSession?->name ?? 'Not configured' }}</span>
+                        <span>Current term: {{ $activeTerm?->name ?? 'Not configured' }}</span>
+                        <span>Updated {{ $student->updated_at?->diffForHumans() ?? 'recently' }}</span>
+                    </div>
                 </div>
             </div>
 
             <!-- Action Buttons -->
             <div class="no-print flex flex-wrap items-center gap-2">
-                <a href="{{ route('school.students.index') }}"
+                <a href="{{ $backUrl }}"
                    class="rounded-xl border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
                     ← Back
                 </a>
@@ -48,6 +68,41 @@
                     <a href="{{ route('school.students.edit', $student) }}"
                        class="rounded-xl border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
                         Edit Profile
+                    </a>
+                @endif
+
+                @if ($canEnterResults && $resultEntryUrl)
+                    <a href="{{ $resultEntryUrl }}"
+                       class="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                        Enter Result
+                    </a>
+                @endif
+
+                @if ($canUploadResults && Route::has('school.results.upload.index'))
+                    <a href="{{ route('school.results.upload.index') }}"
+                       class="rounded-xl border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        Upload Result
+                    </a>
+                @endif
+
+                @if ($canViewReportCards && Route::has('school.report-card-settings.preview'))
+                    <a href="{{ route('school.report-card-settings.preview', ['student_id' => $student->id, 'academic_session_id' => $selectedSession?->id, 'term_id' => $selectedTerm?->id]) }}"
+                       class="rounded-xl border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        View Report Card
+                    </a>
+                @endif
+
+                @if ($canPromote && Route::has('school.student-promotions.create'))
+                    <a href="{{ route('school.student-promotions.create', ['student_id' => $student->id]) }}"
+                       class="rounded-xl border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        Promote/Demote
+                    </a>
+                @endif
+
+                @if ($canCommunicate)
+                    <a href="#communication"
+                       class="rounded-xl border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        Send Email
                     </a>
                 @endif
 
@@ -106,51 +161,27 @@
             </div>
 
             <!-- Quick Navigation -->
-            <div class="no-print mb-6 flex flex-wrap gap-2">
-                <a href="#personal-profile"
-                   class="rounded-xl bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
-                    Overview
-                </a>
-
-                <a href="#academic-profile"
-                   class="rounded-xl bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
-                    Academic Records
-                </a>
-
-                <a href="#result-profile"
-                   class="rounded-xl bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
-                    Results
-                </a>
-
-                <a href="#elective-subjects"
-                   class="rounded-xl bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
-                    Elective Subjects
-                </a>
-
-                <a href="#class-history"
-                   class="rounded-xl bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
-                    Class History
-                </a>
-
-                <a href="#promotion-history"
-                   class="rounded-xl bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
-                    Promotions
-                </a>
-
-                <a href="#scratch-card-usage"
-                   class="rounded-xl bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
-                    Result Access
-                </a>
-
-                <a href="#activity-timeline"
-                   class="rounded-xl bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
-                    Activity
-                </a>
-
-                <a href="#documents"
-                   class="rounded-xl bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">
-                    Documents
-                </a>
+            <div class="no-print sticky top-0 z-20 mb-6 -mx-4 overflow-x-auto border-y border-gray-100 bg-gray-50/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:bg-white/95">
+                <div class="flex min-w-max gap-2">
+                    @foreach ([
+                        'personal-profile' => 'Overview',
+                        'academic-profile' => 'Academic Records',
+                        'result-profile' => 'Results Workspace',
+                        'elective-subjects' => 'Elective Subjects',
+                        'report-cards' => 'Report Cards',
+                        'scratch-card-usage' => 'Scratch Cards',
+                        'parent-guardian' => 'Parent/Guardian',
+                        'promotion-history' => 'Promotion History',
+                        'teacher-remarks' => 'Teacher Remarks',
+                        'activity-timeline' => 'Activity Timeline',
+                        'documents' => 'Documents & Notes',
+                        'communication' => 'Communication',
+                        'attendance-ready' => 'Attendance Ready',
+                        'finance-ready' => 'Finance Ready',
+                    ] as $target => $label)
+                        <a href="#{{ $target }}" class="rounded-xl px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-indigo-50 hover:text-indigo-700">{{ $label }}</a>
+                    @endforeach
+                </div>
             </div>
 
             <!-- Personal Profile Section -->
@@ -562,83 +593,92 @@
 
             <div id="result-profile" class="mb-6 overflow-hidden rounded-2xl bg-white shadow-sm">
                 <div class="border-b border-gray-100 px-6 py-4">
-                    <h3 class="text-base font-semibold text-gray-900">Result Profile</h3>
-                    <p class="mt-1 text-sm text-gray-500">
-                        Subject results for the selected session and term.
-                    </p>
+                    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-900">Results Workspace</h3>
+                            <p class="mt-1 text-sm text-gray-500">Central term result workspace using the existing grading scale and result workflow.</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2 text-xs">
+                            @foreach (($resultWorkspace['workflow_statuses'] ?? []) as $status)
+                                <span class="rounded-full bg-gray-100 px-3 py-1 font-medium text-gray-600">{{ ucfirst($status) }}</span>
+                            @endforeach
+                        </div>
+                    </div>
+                    <form method="GET" action="{{ route('school.students.show', $student) }}" class="no-print mt-4 grid gap-3 md:grid-cols-3">
+                        <select name="academic_session_id" class="rounded-xl border-gray-300 text-sm">
+                            @foreach ($academicSessions as $session)
+                                <option value="{{ $session->id }}" @selected($selectedSession?->id === $session->id)>{{ $session->name }}</option>
+                            @endforeach
+                        </select>
+                        <select name="term_id" class="rounded-xl border-gray-300 text-sm">
+                            @foreach ($terms as $term)
+                                <option value="{{ $term->id }}" @selected($selectedTerm?->id === $term->id)>{{ $term->name }}</option>
+                            @endforeach
+                        </select>
+                        <button class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white">Load Workspace</button>
+                    </form>
                 </div>
-
+                <div class="grid gap-4 border-b border-gray-100 px-6 py-4 sm:grid-cols-3">
+                    <div class="rounded-xl bg-indigo-50 p-4"><p class="text-xs font-medium uppercase text-indigo-600">Registered Subjects</p><p class="mt-2 text-2xl font-semibold text-indigo-900">{{ $resultWorkspace['registered_subject_count'] ?? 0 }}</p></div>
+                    <div class="rounded-xl bg-emerald-50 p-4"><p class="text-xs font-medium uppercase text-emerald-600">Result Rows</p><p class="mt-2 text-2xl font-semibold text-emerald-900">{{ $resultWorkspace['existing_result_count'] ?? 0 }}</p></div>
+                    <div class="rounded-xl bg-amber-50 p-4"><p class="text-xs font-medium uppercase text-amber-600">Active Grading Scales</p><p class="mt-2 text-2xl font-semibold text-amber-900">{{ $resultWorkspace['grading_scale_count'] ?? 0 }}</p></div>
+                </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-100">
-                        <thead class="bg-gray-50">
+                        <thead class="sticky top-0 bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Subject</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Scores</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Grade</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Remark</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Teacher Remark</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Published</th>
+                                @foreach (['Subject', 'CA1', 'CA2', 'CA3', 'Assignment', 'Project', 'Exam', 'Total', 'Grade', 'Position', 'Remark', 'Teacher Remark', 'Officer/Admin Remarks', 'Workflow', 'Last Updated', 'Access'] as $heading)
+                                    <th class="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">{{ $heading }}</th>
+                                @endforeach
                             </tr>
                         </thead>
-
                         <tbody class="divide-y divide-gray-100 bg-white">
-                            @forelse ($results as $result)
-                                <tr>
-                                    <td class="px-6 py-4">
-                                        <div class="font-medium text-gray-900">
-                                            {{ $result->subject->name ?? 'Unknown subject' }}
-                                        </div>
-                                        <div class="text-sm text-gray-500">
-                                            {{ $result->academicSession->name ?? 'No session' }} / {{ $result->term->name ?? 'No term' }}
-                                        </div>
-                                    </td>
-
-                                    <td class="px-6 py-4 text-sm text-gray-600">
-                                        CA: {{ number_format((float) $result->ca_score, 2) }}<br>
-                                        Exam: {{ number_format((float) $result->exam_score, 2) }}<br>
-                                        Total: {{ number_format((float) $result->total_score, 2) }}
-                                    </td>
-
-                                    <td class="px-6 py-4 text-sm font-medium text-gray-900">
-                                        {{ $result->grade ?? 'N/A' }}
-                                    </td>
-
-                                    <td class="px-6 py-4 text-sm text-gray-600">
-                                        {{ $result->remark ?? 'N/A' }}
-                                    </td>
-
-                                    <td class="px-6 py-4 text-sm text-gray-600">
-                                        {{ $result->teacher_remark ?: 'N/A' }}
-                                    </td>
-
-                                    <td class="px-6 py-4">
-                                        <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                                            {{ ucfirst($result->status) }}
-                                        </span>
-                                    </td>
-
-                                    <td class="px-6 py-4 text-sm text-gray-600">
-                                        {{ $result->published_at?->format('d M Y, h:i A') ?? 'Not published' }}
-                                    </td>
+                            @forelse ($workspaceRows as $row)
+                                <tr class="{{ $row['is_pass'] === false ? 'bg-red-50/60' : '' }}">
+                                    <td class="whitespace-nowrap px-4 py-4"><div class="font-medium text-gray-900">{{ $row['subject']?->name ?? 'Unknown subject' }}</div><div class="text-xs text-gray-500">{{ ucfirst($row['assignment']->assignment_type ?? 'core') }} {{ ($row['assignment']->is_elective ?? false) ? '• Elective' : '' }}</div></td>
+                                    <td class="px-4 py-4 text-sm text-gray-600">{{ $row['ca1'] ?? '—' }}</td>
+                                    <td class="px-4 py-4 text-sm text-gray-600">{{ $row['ca2'] ?? '—' }}</td>
+                                    <td class="px-4 py-4 text-sm text-gray-400">{{ $row['ca3'] ?? 'Ready' }}</td>
+                                    <td class="px-4 py-4 text-sm text-gray-400">{{ $row['assignment_score'] ?? 'Ready' }}</td>
+                                    <td class="px-4 py-4 text-sm text-gray-400">{{ $row['project_score'] ?? 'Ready' }}</td>
+                                    <td class="px-4 py-4 text-sm text-gray-600">{{ $row['exam'] ?? '—' }}</td>
+                                    <td class="px-4 py-4 text-sm font-semibold text-gray-900">{{ $row['total'] ?? '—' }}</td>
+                                    <td class="px-4 py-4 text-sm font-semibold text-gray-900">{{ $row['grade'] ?? '—' }}</td>
+                                    <td class="px-4 py-4 text-sm text-gray-400">{{ $row['position'] ?? 'Ready' }}</td>
+                                    <td class="px-4 py-4 text-sm text-gray-600">{{ $row['remark'] ?? '—' }}</td>
+                                    <td class="min-w-48 px-4 py-4 text-sm text-gray-600">{{ $row['subject_teacher_remark'] ?: 'No subject teacher remark yet.' }}</td>
+                                    <td class="min-w-48 px-4 py-4 text-sm text-gray-600">{{ $row['result_officer_remark'] ?: 'Officer ready' }} / {{ $row['school_admin_remark'] ?: 'Admin ready' }}</td>
+                                    <td class="px-4 py-4 text-xs"><span class="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">{{ ucfirst($row['submission_status']) }}</span><span class="ml-1 rounded-full bg-blue-50 px-2 py-1 font-medium text-blue-700">{{ ucfirst($row['publish_status']) }}</span></td>
+                                    <td class="whitespace-nowrap px-4 py-4 text-xs text-gray-500">{{ $row['last_updated']?->format('d M Y, h:i A') ?? 'Not started' }}<br>{{ $row['updated_by'] ?? '—' }}</td>
+                                    <td class="px-4 py-4 text-xs">@if ($row['can_edit'])<span class="rounded-full bg-green-100 px-2 py-1 font-medium text-green-700">Editable</span>@elseif ($row['locked'])<span class="rounded-full bg-gray-900 px-2 py-1 font-medium text-white">Published lock</span>@else<span class="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-600">Read only</span>@endif</td>
                                 </tr>
                             @empty
-                                <tr>
-                                    <td colspan="7" class="px-6 py-12 text-center">
-                                        <div class="flex flex-col items-center justify-center">
-                                            <svg class="h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                            <p class="mt-4 text-sm font-medium text-gray-900">No results found for this selection.</p>
-                                            <p class="mt-1 text-sm text-gray-500">
-                                                Change the session or term filter, or add results for this student.
-                                            </p>
-                                        </div>
-                                    </td>
-                                </tr>
+                                <tr><td colspan="16" class="px-6 py-12 text-center text-sm text-gray-500">No registered subjects were found for this class, session, and term. Configure class subjects or elective subjects to populate the workspace.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <div id="report-cards" class="mb-6 rounded-2xl bg-white p-6 shadow-sm">
+                <h3 class="text-base font-semibold text-gray-900">Report Cards</h3>
+                <p class="mt-1 text-sm text-gray-500">Preview, print, and PDF actions reuse existing report card settings, signatures, grading, comments, and branding.</p>
+                <div class="no-print mt-4 flex flex-wrap gap-2">
+                    @if ($canViewReportCards && Route::has('school.report-card-settings.preview'))
+                        <a href="{{ route('school.report-card-settings.preview', ['student_id' => $student->id, 'academic_session_id' => $selectedSession?->id, 'term_id' => $selectedTerm?->id]) }}" class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white">Preview Report Card</a>
+                    @endif
+                    <button onclick="window.print()" class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700">Print Profile</button>
+                </div>
+            </div>
+
+            <div id="teacher-remarks" class="mb-6 rounded-2xl bg-white p-6 shadow-sm">
+                <h3 class="text-base font-semibold text-gray-900">Teacher Remarks & Comments</h3>
+                <div class="mt-4 grid gap-4 md:grid-cols-2">
+                    @forelse ($workspaceRows->whereNotNull('subject_teacher_remark') as $row)
+                        <div class="rounded-xl border border-gray-100 p-4"><p class="font-medium text-gray-900">{{ $row['subject']?->name }}</p><p class="mt-1 text-sm text-gray-600">{{ $row['subject_teacher_remark'] }}</p><p class="mt-2 text-xs text-gray-500">{{ $row['last_updated']?->diffForHumans() ?? 'Timestamp pending' }}</p></div>
+                    @empty
+                        <p class="text-sm text-gray-500">Subject, class teacher, result officer, and school admin remarks will appear here as the result workflow progresses.</p>
+                    @endforelse
                 </div>
             </div>
 
@@ -745,6 +785,34 @@
                         </div>
                     @endforelse
                 </div>
+            </div>
+
+            <div id="parent-guardian" class="mb-6 rounded-2xl bg-white p-6 shadow-sm">
+                <h3 class="text-base font-semibold text-gray-900">Parent/Guardian</h3>
+                <div class="mt-4 grid gap-4 text-sm sm:grid-cols-3">
+                    <div><p class="text-gray-500">Guardian</p><p class="font-medium text-gray-900">{{ $student->guardian_name ?: 'Not specified' }}</p></div>
+                    <div><p class="text-gray-500">Phone</p><p class="font-medium text-gray-900">{{ $student->guardian_phone ?: 'Not specified' }}</p></div>
+                    <div><p class="text-gray-500">Email</p><p class="font-medium text-gray-900">{{ $student->guardian_email ?: 'Not specified' }}</p></div>
+                </div>
+            </div>
+
+            <div id="communication" class="mb-6 rounded-2xl bg-white p-6 shadow-sm">
+                <h3 class="text-base font-semibold text-gray-900">Communication Center</h3>
+                <p class="mt-1 text-sm text-gray-500">Queue-ready communication actions for result availability, report cards, scratch cards, promotion notices, and academic warnings.</p>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">Guardian email: {{ $student->guardian_email ?: 'Not available' }}</span>
+                    @if ($canCommunicate && Route::has('school.mail-settings.edit'))
+                        <a href="{{ route('school.mail-settings.edit') }}" class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white">Configure School SMTP</a>
+                    @endif
+                    @if (! $canCommunicate)
+                        <span class="text-sm text-gray-500">Read-only for this role.</span>
+                    @endif
+                </div>
+            </div>
+
+            <div class="mb-6 grid gap-4 md:grid-cols-2">
+                <div id="attendance-ready" class="rounded-2xl bg-white p-6 shadow-sm"><h3 class="text-base font-semibold text-gray-900">Attendance Ready</h3><p class="mt-1 text-sm text-gray-500">Reserved for future attendance integration without changing Student 360 routing.</p></div>
+                <div id="finance-ready" class="rounded-2xl bg-white p-6 shadow-sm"><h3 class="text-base font-semibold text-gray-900">Finance Ready</h3><p class="mt-1 text-sm text-gray-500">Reserved for payment links, finance status, and portal balance summaries.</p></div>
             </div>
 
             <!-- Documents & Notes Section -->

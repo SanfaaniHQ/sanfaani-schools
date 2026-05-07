@@ -11,6 +11,7 @@ use App\Notifications\StudentCreatedGuardianNotification;
 use App\Services\AuditLogService;
 use App\Services\AdmissionNumberGeneratorService;
 use App\Services\NotificationPreferenceService;
+use App\Services\StudentAcademicControlCenterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -72,11 +73,19 @@ class StudentController extends Controller
         ]);
     }
 
-    public function show(Request $request, Student $student)
+    public function show(Request $request, Student $student, StudentAcademicControlCenterService $controlCenter)
     {
         $school = $this->currentSchoolOrFail();
 
-        $this->authorizeStudent($student, $school);
+        $controlCenter->authorizeStudentAccess($student, $school);
+
+        if ($controlCenter->supportAccessIsActive()) {
+            app(AuditLogService::class)->log('student_360_support_viewed', $student, $school, metadata: [
+                'support_role_context' => session('support_role_context', 'school_admin'),
+                'student_id' => $student->id,
+                'admission_number' => $student->admission_number,
+            ], request: $request);
+        }
 
         $student->load([
             'schoolClass',
@@ -86,6 +95,7 @@ class StudentController extends Controller
             'classEnrollments.academicSession',
             'classEnrollments.schoolClass',
             'classEnrollments.promotedFrom.schoolClass',
+            'school',
         ]);
 
         $academicSessions = $school->academicSessions()
@@ -167,6 +177,8 @@ class StudentController extends Controller
                 ->where('status', 'active')
                 ->orderBy('name')
                 ->get(),
+            'controlCenterPermissions' => $controlCenter->permissions($student, $school),
+            'resultWorkspace' => $controlCenter->resultWorkspace($student, $school, $selectedSession, $selectedTerm),
             'electiveSubjects' => $student->electiveSubjects()
                 ->with(['subject', 'academicSession', 'term'])
                 ->latest()
