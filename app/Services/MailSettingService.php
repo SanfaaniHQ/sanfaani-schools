@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\MailSetting;
+use App\Models\School;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
@@ -21,12 +22,36 @@ class MailSettingService
 
     public function current(): MailSetting
     {
-        return MailSetting::firstOrCreate([], [
+        return MailSetting::firstOrCreate(['school_id' => null], [
             'mailer' => config('mail.default', 'log'),
             'from_address' => config('mail.from.address'),
             'from_name' => config('mail.from.name'),
             'is_enabled' => false,
         ]);
+    }
+
+    public function forSchool(School $school): MailSetting
+    {
+        return MailSetting::firstOrCreate(['school_id' => $school->id], [
+            'mailer' => 'log',
+            'from_address' => $school->email ?: config('mail.from.address'),
+            'from_name' => $school->name ?: config('mail.from.name'),
+            'is_enabled' => false,
+            'metadata' => ['fallback' => 'platform'],
+        ]);
+    }
+
+    public function applyForSchool(School $school): void
+    {
+        $schoolSetting = $this->forSchool($school);
+
+        if ($schoolSetting->is_enabled) {
+            $this->apply($schoolSetting);
+
+            return;
+        }
+
+        $this->apply($this->current());
     }
 
     public function apply(?MailSetting $setting = null): void
